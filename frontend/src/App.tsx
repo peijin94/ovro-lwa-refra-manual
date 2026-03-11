@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   commitParams,
   fetchDataFiles,
@@ -6,6 +6,7 @@ import {
   fetchMultiChannelData,
   fetchOutputFile,
   loadParamsForFile,
+  setDataRoot as setDataRootApi,
   setOutputFile,
 } from './api'
 import type { ChannelRange, MultiChannelData, Params } from './types'
@@ -31,10 +32,14 @@ const DEFAULT_CONTOUR_VALUE = 2e5
 const DEFAULT_VALUE_POWER_INDEX = -0.1
 const DEFAULT_CHANNEL_CADENCE = 5
 
+const EMPTY_MULTI_CHANNEL_DATA: MultiChannelData = {
+  channels: [],
+  contours: [],
+  spatialExtent: { xMin: 0, xMax: 0, yMin: 0, yMax: 0 },
+}
+
 function App() {
   const [data, setData] = useState<MultiChannelData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   const [availableFiles, setAvailableFiles] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -48,6 +53,20 @@ function App() {
   const [channelCadence, setChannelCadence] = useState<number>(DEFAULT_CHANNEL_CADENCE)
   const [drawSun, setDrawSun] = useState<boolean>(true)
   const [autoLoadParams, setAutoLoadParams] = useState<boolean>(false)
+
+  const currentIndex = selectedFile ? availableFiles.indexOf(selectedFile) : -1
+  const hasPrevFile = currentIndex > 0
+  const hasNextFile = currentIndex >= 0 && currentIndex < availableFiles.length - 1
+
+  const goPrevFile = () => {
+    if (!hasPrevFile) return
+    setSelectedFile(availableFiles[currentIndex - 1])
+  }
+
+  const goNextFile = () => {
+    if (!hasNextFile) return
+    setSelectedFile(availableFiles[currentIndex + 1])
+  }
 
   // Load list of available HDF files once on mount.
   useEffect(() => {
@@ -66,10 +85,9 @@ function App() {
         if (files.length > 0) {
           setSelectedFile(files[0])
         }
-      } catch (err) {
+      } catch {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        setError(message)
+        window.alert('Failed to load initial data files. Check that the backend is running.')
       }
     })()
 
@@ -81,12 +99,10 @@ function App() {
   // Whenever the selected file changes, load its contour data.
   useEffect(() => {
     if (!selectedFile) {
-      setLoading(false)
       return
     }
 
     let cancelled = false
-    setLoading(true)
     ;(async () => {
       try {
         const result = await fetchMultiChannelData(selectedFile, contourValue, valuePowerIndex)
@@ -100,14 +116,9 @@ function App() {
             end: result.channels.length - 1,
           })
         }
-      } catch (err) {
+      } catch {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        setError(message)
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        window.alert('Failed to load contour data for this file.')
       }
     })()
 
@@ -116,13 +127,6 @@ function App() {
     }
   }, [selectedFile, contourValue, valuePowerIndex])
 
-  const derivedState = useMemo(
-    () => ({
-      hasData: !!data && data.channels.length > 0,
-    }),
-    [data],
-  )
-
   const handleChangeOutputFile = async () => {
     const current = outputFile || './manual_corr.csv'
     const next = window.prompt('Enter output CSV file path', current)
@@ -130,9 +134,8 @@ function App() {
     try {
       const updated = await setOutputFile(next)
       setOutputFileState(updated)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error updating output file'
-      setError(message)
+    } catch {
+      window.alert('Failed to update output file path.')
     }
   }
 
@@ -140,9 +143,32 @@ function App() {
     if (!selectedFile) return
     try {
       await commitParams(params, selectedFile)
+    } catch {
+      window.alert('Failed to commit parameters.')
+    }
+  }
+
+  const handleEditDataRootValue = (path: string) => {
+    setDataRoot(path)
+  }
+
+  const handleApplyDataRoot = async () => {
+    const next = dataRoot.trim()
+    if (!next) return
+    try {
+      const updatedRoot = await setDataRootApi(next)
+      setDataRoot(updatedRoot)
+      const files = await fetchDataFiles()
+      setAvailableFiles(files)
+      if (files.length > 0) {
+        setSelectedFile(files[0])
+      } else {
+        setSelectedFile(null)
+        setData(null)
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error committing parameters'
-      setError(message)
+      const message = err instanceof Error ? err.message : 'Unknown error updating data root'
+      window.alert(message)
     }
   }
 
@@ -166,28 +192,36 @@ function App() {
     }
   }, [autoLoadParams, selectedFile])
 
-  if (error) {
-    return (
-      <div className="app-root">
-        <p>Failed to load contour data.</p>
-        <pre>{error}</pre>
-      </div>
-    )
-  }
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      const target = event.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+          return
+        }
+      }
+      if (event.key === 'ArrowLeft') {
+        goPrevFile()
+      } else if (event.key === 'ArrowRight') {
+        goNextFile()
+      }
+    }
 
-  if (loading) {
-    return <div className="app-root">Loading contour data…</div>
-  }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [goPrevFile, goNextFile])
 
-  if (!derivedState.hasData || !data || !selectedFile) {
-    return <div className="app-root">No contour data available.</div>
-  }
+  const contourData = data ?? EMPTY_MULTI_CHANNEL_DATA
 
   return (
     <div className="app-root">
       <div className="app-main">
         <ContourPanel
-          data={data}
+          data={contourData}
           params={params}
           channelRange={channelRange}
           channelCadence={channelCadence}
@@ -199,9 +233,10 @@ function App() {
               params={params}
               onChangeParams={setParams}
               onCommit={handleCommit}
-              availableFiles={availableFiles}
-              selectedFile={selectedFile}
-              onChangeSelectedFile={setSelectedFile}
+              hasPrevFile={hasPrevFile}
+              hasNextFile={hasNextFile}
+              onPrevFile={goPrevFile}
+              onNextFile={goNextFile}
             />
             <ParamsPanel
               contourValue={contourValue}
@@ -212,7 +247,7 @@ function App() {
               onChangeChannelRange={setChannelRange}
               channelCadence={channelCadence}
               onChangeChannelCadence={setChannelCadence}
-              maxChannelIndex={data.channels.length - 1}
+              maxChannelIndex={contourData.channels.length - 1}
               drawSun={drawSun}
               onChangeDrawSun={setDrawSun}
             />
@@ -222,6 +257,8 @@ function App() {
             availableFiles={availableFiles}
             selectedFile={selectedFile}
             onChangeSelectedFile={setSelectedFile}
+            onChangeDataRootValue={handleEditDataRootValue}
+            onApplyDataRoot={handleApplyDataRoot}
             outputFile={outputFile}
             onChangeOutputFile={handleChangeOutputFile}
             autoLoadParams={autoLoadParams}

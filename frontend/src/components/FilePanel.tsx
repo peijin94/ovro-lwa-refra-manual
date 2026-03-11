@@ -3,6 +3,8 @@ type FilePanelProps = {
   availableFiles: string[]
   selectedFile: string | null
   onChangeSelectedFile: (filename: string) => void
+  onChangeDataRootValue: (path: string) => void
+  onApplyDataRoot: () => void
   outputFile: string
   onChangeOutputFile: () => void
   autoLoadParams: boolean
@@ -14,6 +16,8 @@ export function FilePanel({
   availableFiles,
   selectedFile,
   onChangeSelectedFile,
+  onChangeDataRootValue,
+  onApplyDataRoot,
   outputFile,
   onChangeOutputFile,
   autoLoadParams,
@@ -37,21 +41,21 @@ export function FilePanel({
               </option>
             ))}
           </select>
-          <div className="control-field-row">
-            <button
-              type="button"
-              className="load-data-button"
-              onClick={() => {
-                const current = dataRoot || ''
-                const next = window.prompt('Enter data directory on server', current)
-                if (!next || next === current) return
-                onChangeSelectedFile(next)
-              }}
-            >
+        </div>
+        <div className="control-field control-field-wide">
+          <label htmlFor="data-dir">Data dir</label>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              id="data-dir"
+              type="text"
+              value={dataRoot}
+              onChange={(e) => onChangeDataRootValue(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="load-data-button" onClick={onApplyDataRoot}>
               Load Data
             </button>
           </div>
-          <div className="data-root-label">Dir: {dataRoot || '(default data/)'}</div>
         </div>
         <div className="control-field control-field-wide">
           <label htmlFor="output-file">Out .csv</label>

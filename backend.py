@@ -217,6 +217,10 @@ class CommitParamsRequest(BaseModel):
   py1: float
 
 
+class DataRootRequest(BaseModel):
+  path: str
+
+
 def _resolve_outfile(path: Path) -> Path:
   path = path.expanduser()
   if not path.is_absolute():
@@ -320,6 +324,19 @@ def get_data_root() -> Dict[str, Any]:
   """
   Return the current server-side data directory used to search for HDF files.
   """
+  return {"dataRoot": str(DATA_DIR)}
+
+
+@app.post("/api/data-root")
+def set_data_root(req: DataRootRequest) -> Dict[str, Any]:
+  """
+  Update the server-side data directory used to search for HDF files.
+  """
+  global DATA_DIR
+  new_root = Path(req.path).expanduser()
+  if not new_root.is_dir():
+    raise HTTPException(status_code=400, detail=f"Data directory does not exist: {new_root}")
+  DATA_DIR = new_root
   return {"dataRoot": str(DATA_DIR)}
 
 

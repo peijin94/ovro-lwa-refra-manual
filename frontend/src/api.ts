@@ -45,6 +45,27 @@ export async function fetchDataRoot(): Promise<string> {
   return json.dataRoot
 }
 
+export async function setDataRoot(path: string): Promise<string> {
+  const response = await fetch(`${BASE_URL}/data-root`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+  if (!response.ok) {
+    let detail = ''
+    try {
+      const json = (await response.json()) as { detail?: string }
+      detail = json.detail ?? ''
+    } catch {
+      // ignore JSON parse errors; fall back to status text
+    }
+    const msg = detail || `Failed to update data root: ${response.status} ${response.statusText}`
+    throw new Error(msg)
+  }
+  const json = (await response.json()) as DataRootInfo
+  return json.dataRoot
+}
+
 export async function fetchOutputFile(): Promise<string> {
   const response = await fetch(`${BASE_URL}/output-file`)
   if (!response.ok) {

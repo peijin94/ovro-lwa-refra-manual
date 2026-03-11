@@ -5,29 +5,21 @@ type ControlPadPanelProps = {
   params: Params
   onChangeParams: (params: Params) => void
   onCommit: () => void
-  availableFiles: string[]
-  selectedFile: string | null
-  onChangeSelectedFile: (filename: string) => void
+  hasPrevFile: boolean
+  hasNextFile: boolean
+  onPrevFile: () => void
+  onNextFile: () => void
 }
 
 export function ControlPadPanel({
   params,
   onChangeParams,
   onCommit,
-  availableFiles,
-  selectedFile,
-  onChangeSelectedFile,
+  hasPrevFile,
+  hasNextFile,
+  onPrevFile,
+  onNextFile,
 }: ControlPadPanelProps) {
-  const currentIndex = selectedFile ? availableFiles.indexOf(selectedFile) : -1
-  const hasPrev = currentIndex > 0
-  const hasNext = currentIndex >= 0 && currentIndex < availableFiles.length - 1
-  const goPrev = () => {
-    if (hasPrev) onChangeSelectedFile(availableFiles[currentIndex - 1])
-  }
-  const goNext = () => {
-    if (hasNext) onChangeSelectedFile(availableFiles[currentIndex + 1])
-  }
-
   return (
     <div className="panel control-pad-panel">
       <div className="controls-header">
@@ -37,8 +29,8 @@ export function ControlPadPanel({
             type="button"
             className="file-nav-button"
             title="Previous file"
-            disabled={!hasPrev}
-            onClick={goPrev}
+            disabled={!hasPrevFile}
+            onClick={onPrevFile}
           >
             ‹
           </button>
@@ -46,8 +38,8 @@ export function ControlPadPanel({
             type="button"
             className="file-nav-button"
             title="Next file"
-            disabled={!hasNext}
-            onClick={goNext}
+            disabled={!hasNextFile}
+            onClick={onNextFile}
           >
             ›
           </button>

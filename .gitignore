@@ -1,4 +1,9 @@
-# Byte-compiled / optimized / DLL files
+# Keep checked-in Vite build so users without npm can run pre-built UI
+!frontend/dist/
+!frontend/dist/**
+
+# Byte-compiled / optimized / DLL file
+
 __pycache__/
 *.py[codz]
 *$py.class
@@ -18,7 +23,7 @@ data/*
 .Python
 build/
 develop-eggs/
-dist/
+#dist/
 downloads/
 eggs/
 .eggs/
@@ -33,6 +38,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Keep checked-in Vite build so users without npm can run pre-built UI
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
