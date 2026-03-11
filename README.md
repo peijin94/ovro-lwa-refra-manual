@@ -41,17 +41,17 @@ where *f* is channel frequency. Results are written to a CSV (e.g. `manual_corr.
 
    Backend runs at `http://127.0.0.1:8989` by default. Set `PORT` if needed.
 
-3. **Frontend**
+3. **Frontend (no npm required for normal use)**
 
-   In a separate terminal:
+   For typical use you only need the Python backend. Once `python backend.py` is running, open a browser at:
 
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
+   ```text
+   http://127.0.0.1:8989
    ```
 
-   Dev server is usually at `http://localhost:5173`. For production, run `npm run build` and serve the app via the backend (backend serves `frontend/dist` when present).
+   The backend will serve the bundled frontend UI if a built `frontend/dist` directory is present (this is how binary/source releases of this tool should be packaged). You do **not** need `npm` or Node.js just to run the tool.
+
+   If you are developing the UI from source and **do** have `npm`, see `frontend/README.md` for the Vite dev workflow (`npm install`, `npm run dev`, etc.).
 
 4. **Data**  
    Put HDF5 image cubes in the `data/` directory (or point the app to another directory via **Load Data**). Filenames should contain a UTC timestamp like `2024-11-21T183806Z` so the tool can match commits to files.
