@@ -7,6 +7,10 @@ Web app for interactively fitting **px0, py0, px1, py1** so that multi-frequency
 
 where *f* is channel frequency. Results are written to a CSV (e.g. `manual_corr.csv`) keyed by observation time (UTC from the data filename).
 
+
+---
+<img width="1758" height="1048" alt="image" src="https://github.com/user-attachments/assets/5b9fc3d5-19ff-4ff6-8d6a-4b4040234cdc" />
+
 ---
 
 ## Setup
