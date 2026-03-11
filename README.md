@@ -41,7 +41,7 @@ where *f* is channel frequency. Results are written to a CSV (e.g. `manual_corr.
 
    Backend runs at `http://127.0.0.1:8989` by default. Set `PORT` if needed.
 
-3. **Frontend (no npm required for normal use)**
+3. **Frontend**
 
    For typical use you only need the Python backend. Once `python backend.py` is running, open a browser at:
 
