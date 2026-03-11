@@ -10,13 +10,27 @@
 
 .app-main {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 1.5rem;
+  gap: 1rem;
   width: 100%;
-  max-width: 1200px;
-  padding: 1.5rem;
+  max-width: 1400px;
+  padding: 1rem;
   box-sizing: border-box;
+}
+
+.app-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+
+.app-right-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  min-height: 0;
 }
 
 .panel {
@@ -64,6 +78,64 @@
   gap: 1rem;
 }
 
+.controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.controls-header .panel-title {
+  margin-bottom: 0;
+}
+
+.file-nav-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.file-nav-button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0.375rem;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.file-nav-button:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.file-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.commit-button {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #4b5563;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ecfdf5;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.35);
+}
+
+.commit-button:hover {
+  filter: brightness(1.05);
+}
+
 .joystick-row {
   display: flex;
   flex-direction: column;
@@ -106,9 +178,9 @@
 }
 
 .param-inputs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   font-size: 0.8rem;
 }
 
@@ -138,7 +210,7 @@
   background: #020617;
   border: 1px solid #1f2937;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   font-size: 0.8rem;
 }
@@ -149,8 +221,29 @@
   gap: 0.25rem;
 }
 
+.control-field-wide {
+  grid-column: 1 / -1;
+}
+
+.control-field-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #d1d5db;
+}
+
 .control-field label {
   color: #9ca3af;
+}
+
+.control-field .control-checkbox {
+  margin-right: 0.35rem;
 }
 
 .control-field input {
@@ -171,16 +264,64 @@
   font-size: 0.8rem;
 }
 
+.load-data-button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.load-data-button:hover {
+  background: #1f2937;
+}
+
+.data-root-label {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+  word-break: break-all;
+}
+
 .control-caption {
   margin-top: 0.5rem;
   font-size: 0.7rem;
   color: #6b7280;
 }
 
+.file-panel-fields,
+.params-panel-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.control-pad-panel {
+  gap: 0.75rem;
+}
+
+.channel-range-inputs {
+  display: flex;
+  gap: 0.25rem;
+}
+
 @media (max-width: 900px) {
   .app-main {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .app-right-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .control-pad {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

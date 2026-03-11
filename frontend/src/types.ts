@@ -46,4 +46,24 @@ export type DataFileList = {
   files: string[]
 }
 
+export type DataRootInfo = {
+  dataRoot: string
+}
+
+export type OutputFileInfo = {
+  outputFile: string
+}
+
+export type LoadParamsResponse =
+  | { found: false }
+  | {
+      found: true
+      px0: number
+      py0: number
+      px1: number
+      py1: number
+    }
+
+
+
 

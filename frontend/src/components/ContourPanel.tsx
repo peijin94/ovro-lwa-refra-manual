@@ -164,7 +164,7 @@ export function ContourPanel({
 
   return (
     <div className="panel">
-      <div className="panel-title">Contours</div>
+      <div className="panel-title">Contour</div>
       <div className="contour-svg-wrapper">
         <div className="contour-svg-inner">
           <svg ref={svgRef} className="contour-svg" />

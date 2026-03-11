@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchDataFiles, fetchMultiChannelData } from './api'
+import {
+  commitParams,
+  fetchDataFiles,
+  fetchDataRoot,
+  fetchMultiChannelData,
+  fetchOutputFile,
+  loadParamsForFile,
+  setOutputFile,
+} from './api'
 import type { ChannelRange, MultiChannelData, Params } from './types'
 import { ContourPanel } from './components/ContourPanel'
-import { ControlsPanel } from './components/ControlsPanel'
+import { ControlPadPanel } from './components/ControlPadPanel'
+import { FilePanel } from './components/FilePanel'
+import { ParamsPanel } from './components/ParamsPanel'
 import './App.css'
 
 const DEFAULT_PARAMS: Params = {
@@ -28,6 +38,8 @@ function App() {
 
   const [availableFiles, setAvailableFiles] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [dataRoot, setDataRoot] = useState<string>('')
+  const [outputFile, setOutputFileState] = useState<string>('')
 
   const [params, setParams] = useState<Params>(DEFAULT_PARAMS)
   const [contourValue, setContourValue] = useState<number>(DEFAULT_CONTOUR_VALUE)
@@ -35,14 +47,21 @@ function App() {
   const [channelRange, setChannelRange] = useState<ChannelRange>(DEFAULT_CHANNEL_RANGE)
   const [channelCadence, setChannelCadence] = useState<number>(DEFAULT_CHANNEL_CADENCE)
   const [drawSun, setDrawSun] = useState<boolean>(true)
+  const [autoLoadParams, setAutoLoadParams] = useState<boolean>(false)
 
   // Load list of available HDF files once on mount.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const files = await fetchDataFiles()
+        const [root, files, outfile] = await Promise.all([
+          fetchDataRoot(),
+          fetchDataFiles(),
+          fetchOutputFile(),
+        ])
         if (cancelled) return
+        setDataRoot(root)
+        setOutputFileState(outfile)
         setAvailableFiles(files)
         if (files.length > 0) {
           setSelectedFile(files[0])
@@ -104,6 +123,49 @@ function App() {
     [data],
   )
 
+  const handleChangeOutputFile = async () => {
+    const current = outputFile || './manual_corr.csv'
+    const next = window.prompt('Enter output CSV file path', current)
+    if (!next || next === current) return
+    try {
+      const updated = await setOutputFile(next)
+      setOutputFileState(updated)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error updating output file'
+      setError(message)
+    }
+  }
+
+  const handleCommit = async () => {
+    if (!selectedFile) return
+    try {
+      await commitParams(params, selectedFile)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error committing parameters'
+      setError(message)
+    }
+  }
+
+  // When auto-load is enabled, pull params from CSV based on the selected file's timestamp.
+  useEffect(() => {
+    if (!autoLoadParams || !selectedFile) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const loaded = await loadParamsForFile(selectedFile)
+        if (cancelled || !loaded) return
+        setParams(loaded)
+      } catch {
+        // Ignore load failures; user can still adjust params manually.
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [autoLoadParams, selectedFile])
+
   if (error) {
     return (
       <div className="app-root">
@@ -131,24 +193,41 @@ function App() {
           channelCadence={channelCadence}
           drawSun={drawSun}
         />
-        <ControlsPanel
-          params={params}
-          onChangeParams={setParams}
-          contourValue={contourValue}
-          onChangeContourValue={setContourValue}
-          valuePowerIndex={valuePowerIndex}
-          onChangeValuePowerIndex={setValuePowerIndex}
-          channelRange={channelRange}
-          onChangeChannelRange={setChannelRange}
-          channelCadence={channelCadence}
-          onChangeChannelCadence={setChannelCadence}
-          maxChannelIndex={data.channels.length - 1}
-          availableFiles={availableFiles}
-          selectedFile={selectedFile}
-          onChangeSelectedFile={setSelectedFile}
-          drawSun={drawSun}
-          onChangeDrawSun={setDrawSun}
-        />
+        <div className="app-right">
+          <div className="app-right-top">
+            <ControlPadPanel
+              params={params}
+              onChangeParams={setParams}
+              onCommit={handleCommit}
+              availableFiles={availableFiles}
+              selectedFile={selectedFile}
+              onChangeSelectedFile={setSelectedFile}
+            />
+            <ParamsPanel
+              contourValue={contourValue}
+              onChangeContourValue={setContourValue}
+              valuePowerIndex={valuePowerIndex}
+              onChangeValuePowerIndex={setValuePowerIndex}
+              channelRange={channelRange}
+              onChangeChannelRange={setChannelRange}
+              channelCadence={channelCadence}
+              onChangeChannelCadence={setChannelCadence}
+              maxChannelIndex={data.channels.length - 1}
+              drawSun={drawSun}
+              onChangeDrawSun={setDrawSun}
+            />
+          </div>
+          <FilePanel
+            dataRoot={dataRoot}
+            availableFiles={availableFiles}
+            selectedFile={selectedFile}
+            onChangeSelectedFile={setSelectedFile}
+            outputFile={outputFile}
+            onChangeOutputFile={handleChangeOutputFile}
+            autoLoadParams={autoLoadParams}
+            onChangeAutoLoadParams={setAutoLoadParams}
+          />
+        </div>
       </div>
     </div>
   )

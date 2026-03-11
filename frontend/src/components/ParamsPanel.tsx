@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { ChannelRange, Params } from '../types'
-import { Joystick } from './Joystick'
+import type { ChannelRange } from '../types'
 
-type ControlsPanelProps = {
-  params: Params
-  onChangeParams: (params: Params) => void
+type ParamsPanelProps = {
   contourValue: number
   onChangeContourValue: (value: number) => void
   valuePowerIndex: number
@@ -14,16 +11,11 @@ type ControlsPanelProps = {
   channelCadence: number
   onChangeChannelCadence: (value: number) => void
   maxChannelIndex: number
-  availableFiles: string[]
-  selectedFile: string | null
-  onChangeSelectedFile: (filename: string) => void
   drawSun: boolean
   onChangeDrawSun: (value: boolean) => void
 }
 
-export function ControlsPanel({
-  params,
-  onChangeParams,
+export function ParamsPanel({
   contourValue,
   onChangeContourValue,
   valuePowerIndex,
@@ -33,76 +25,34 @@ export function ControlsPanel({
   channelCadence,
   onChangeChannelCadence,
   maxChannelIndex,
-  availableFiles,
-  selectedFile,
-  onChangeSelectedFile,
   drawSun,
   onChangeDrawSun,
-}: ControlsPanelProps) {
+}: ParamsPanelProps) {
   const [localContourValue, setLocalContourValue] = useState<number>(contourValue)
+  const [localPowerIndex, setLocalPowerIndex] = useState<number>(valuePowerIndex)
 
   useEffect(() => {
     setLocalContourValue(contourValue)
   }, [contourValue])
-  const handleP0Change = (px0: number, py0: number) => {
-    onChangeParams({ ...params, px0, py0 })
-  }
 
-  const handleP1Change = (px1: number, py1: number) => {
-    onChangeParams({ ...params, px1, py1 })
-  }
+  useEffect(() => {
+    setLocalPowerIndex(valuePowerIndex)
+  }, [valuePowerIndex])
 
   const handleChannelRangeChange = (key: 'start' | 'end', value: number) => {
     const clamped = Math.min(Math.max(0, Math.floor(value)), maxChannelIndex)
     const next: ChannelRange = { ...channelRange, [key]: clamped }
     if (next.start > next.end) {
-      if (key === 'start') {
-        next.end = clamped
-      } else {
-        next.start = clamped
-      }
+      if (key === 'start') next.end = clamped
+      else next.start = clamped
     }
     onChangeChannelRange(next)
   }
 
   return (
-    <div className="panel controls-root">
-      <div className="panel-title">Controls</div>
-      <Joystick
-        label="Control P0"
-        x={params.px0}
-        y={params.py0}
-        xRange={[-2e19, 2e19]}
-        yRange={[-2e19, 2e19]}
-        onChange={handleP0Change}
-        onReset={() => onChangeParams({ ...params, px0: 0, py0: 0 })}
-      />
-      <Joystick
-        label="Control P1"
-        x={params.px1}
-        y={params.py1}
-        xRange={[-3000, 3000]}
-        yRange={[-3000, 3000]}
-        onChange={handleP1Change}
-        onReset={() => onChangeParams({ ...params, px1: 0, py1: 0 })}
-      />
-
-      <div className="control-pad">
-        <div className="control-field">
-          <label htmlFor="data-file">Data file</label>
-          <select
-            id="data-file"
-            value={selectedFile ?? ''}
-            onChange={(e) => onChangeSelectedFile(e.target.value)}
-          >
-            {availableFiles.length === 0 && <option value="">No files found</option>}
-            {availableFiles.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className="panel params-panel">
+      <div className="panel-title">Param</div>
+      <div className="params-panel-fields">
         <div className="control-field">
           <label htmlFor="contour-value">Contour value</label>
           <input
@@ -118,8 +68,9 @@ export function ControlsPanel({
           <input
             id="value-power-index"
             type="number"
-            value={valuePowerIndex}
-            onChange={(e) => onChangeValuePowerIndex(Number(e.target.value))}
+            value={Number.isFinite(localPowerIndex) ? localPowerIndex : 0}
+            onChange={(e) => setLocalPowerIndex(Number(e.target.value))}
+            onBlur={() => onChangeValuePowerIndex(localPowerIndex)}
           />
         </div>
         <div className="control-field">
@@ -129,19 +80,20 @@ export function ControlsPanel({
               type="checkbox"
               checked={drawSun}
               onChange={(e) => onChangeDrawSun(e.target.checked)}
-              style={{ marginRight: '0.35rem' }}
+              className="control-checkbox"
             />
             Draw Sun R = 1
           </label>
         </div>
         <div className="control-field">
           <label>Channel range</label>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <div className="channel-range-inputs">
             <input
               type="number"
               min={0}
               max={maxChannelIndex}
               value={channelRange.start}
+              title="Channel range start"
               onChange={(e) => handleChannelRangeChange('start', Number(e.target.value))}
             />
             <input
@@ -149,6 +101,7 @@ export function ControlsPanel({
               min={0}
               max={maxChannelIndex}
               value={channelRange.end}
+              title="Channel range end"
               onChange={(e) => handleChannelRangeChange('end', Number(e.target.value))}
             />
           </div>
@@ -164,8 +117,6 @@ export function ControlsPanel({
           />
         </div>
       </div>
-      <div className="control-caption">Use P0 and P1 joysticks to align contours across frequency.</div>
     </div>
   )
 }
-
