@@ -11,8 +11,25 @@ where *f* is channel frequency. Results are written to a CSV (e.g. `manual_corr.
 
 ## Setup
 
-1. **Backend (Python)**  
-   From the project root, create a venv, install dependencies (e.g. `h5py`, `numpy`, `fastapi`, `uvicorn`, `skimage`, `pydantic`), and run:
+1. **Clone the repo**
+
+   ```bash
+   git clone <this-repo-url>
+   cd ovro-lwa-refra-manual
+   ```
+
+2. **Backend (Python)**
+
+   Create and activate a virtual environment (recommended), then install Python dependencies:
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+   Start the backend:
 
    ```bash
    python backend.py
@@ -20,17 +37,19 @@ where *f* is channel frequency. Results are written to a CSV (e.g. `manual_corr.
 
    Backend runs at `http://127.0.0.1:8989` by default. Set `PORT` if needed.
 
-2. **Frontend**  
-   In `frontend/`:
+3. **Frontend**
+
+   In a separate terminal:
 
    ```bash
+   cd frontend
    npm install
    npm run dev
    ```
 
    Dev server is usually at `http://localhost:5173`. For production, run `npm run build` and serve the app via the backend (backend serves `frontend/dist` when present).
 
-3. **Data**  
+4. **Data**  
    Put HDF5 image cubes in the `data/` directory (or point the app to another directory via **Load Data**). Filenames should contain a UTC timestamp like `2024-11-21T183806Z` so the tool can match commits to files.
 
 ---
