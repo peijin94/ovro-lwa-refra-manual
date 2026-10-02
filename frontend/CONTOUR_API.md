@@ -45,8 +45,10 @@ The endpoint should return a JSON body of the form:
   - `freqHz`: channel center frequency in Hz (typically 20–80 × 10^6).
 - `contours`: list of contour polygons
   - `channelId`: channel `id` this contour belongs to.
-  - `level`: contour level index or value. The UI currently uses a single
-    `contourLevel` value (default `1`) and filters by exact equality.
+  - `level`: per-channel contour level in data units, computed as
+    `contourValue * (freqHz / freq0) ** valuePowerIndex`, where `contourValue`
+    and `valuePowerIndex` are UI parameters and `freq0` is the first channel's
+    frequency.
   - `points`: array of `{x, y}` vertices in **physical coordinates**, derived
     from FITS header information (e.g. CRVAL/CDELT, or project-specific keys).
 - `spatialExtent`: global x/y range before offsets
@@ -63,5 +65,5 @@ according to:
 
 The app then renders contours using `(x + x_offset, y + y_offset)`. The P0
 joystick controls `px0` and `py0` (large range ~[-2e19, 2e19]) and the P1
-joystick controls `px1` and `py1` (range ~[-1500, 1500]).
+joystick controls `px1` and `py1` (range ~[-3000, 3000]).
 

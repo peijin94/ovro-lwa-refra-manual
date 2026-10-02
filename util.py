@@ -37,19 +37,26 @@ def recover_fits_from_h5(hdf5_file, fits_out=None, return_data=False, return_met
             return meta
 
         # Read in the compressed data
+        expected_shape = (int(datashape[-2]), int(datashape[-1]))
         recover_data = np.zeros(datashape)
         for pol in range(datashape[0]):
             for ch_idx, freq in enumerate(meta['cfreqs']):
                 tmp_small = f[f'FITS_pol{pol}ch{str(ch_idx).rjust(4, "0")}'][:]
                 if tmp_small.shape[0] == 1:
-                    recover_data[pol, ch_idx, :, :] = tmp_small[0, 0]
+                    img = tmp_small[0, 0]
                 else:
-                    recover_data[pol, ch_idx, :, :] = zoom(
+                    img = zoom(
                         tmp_small,
                         datashape[-1] / tmp_small.shape[-1],
                         order=3,
                         prefilter=False,
                     )
+                if tuple(img.shape) != expected_shape:
+                    raise ValueError(
+                        f"{hdf5_file} pol{pol} ch{ch_idx}: decoded image has shape "
+                        f"{tuple(img.shape)}, expected {expected_shape}"
+                    )
+                recover_data[pol, ch_idx, :, :] = img
 
         if return_data:
             return meta, recover_data

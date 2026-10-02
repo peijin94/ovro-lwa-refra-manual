@@ -40,6 +40,7 @@ export function ParamsPanel({
   }, [valuePowerIndex])
 
   const handleChannelRangeChange = (key: 'start' | 'end', value: number) => {
+    if (!Number.isFinite(value)) return
     const clamped = Math.min(Math.max(0, Math.floor(value)), maxChannelIndex)
     const next: ChannelRange = { ...channelRange, [key]: clamped }
     if (next.start > next.end) {
@@ -60,7 +61,12 @@ export function ParamsPanel({
             type="number"
             value={Number.isFinite(localContourValue) ? localContourValue : 0}
             onChange={(e) => setLocalContourValue(Number(e.target.value))}
-            onBlur={() => onChangeContourValue(localContourValue)}
+            onBlur={() => {
+              // Never commit NaN upstream; it would fail backend validation
+              // and leave the UI showing contours for a stale value.
+              if (Number.isFinite(localContourValue)) onChangeContourValue(localContourValue)
+              else setLocalContourValue(contourValue)
+            }}
           />
         </div>
         <div className="control-field">
@@ -70,7 +76,10 @@ export function ParamsPanel({
             type="number"
             value={Number.isFinite(localPowerIndex) ? localPowerIndex : 0}
             onChange={(e) => setLocalPowerIndex(Number(e.target.value))}
-            onBlur={() => onChangeValuePowerIndex(localPowerIndex)}
+            onBlur={() => {
+              if (Number.isFinite(localPowerIndex)) onChangeValuePowerIndex(localPowerIndex)
+              else setLocalPowerIndex(valuePowerIndex)
+            }}
           />
         </div>
         <div className="control-field">
@@ -82,7 +91,7 @@ export function ParamsPanel({
               onChange={(e) => onChangeDrawSun(e.target.checked)}
               className="control-checkbox"
             />
-            Draw Sun R = 1
+            Draw Sun R⊙
           </label>
         </div>
         <div className="control-field">
@@ -113,7 +122,10 @@ export function ParamsPanel({
             type="number"
             min={1}
             value={channelCadence}
-            onChange={(e) => onChangeChannelCadence(Math.max(1, Number(e.target.value)))}
+            onChange={(e) => {
+              const v = Math.floor(Number(e.target.value))
+              if (Number.isFinite(v)) onChangeChannelCadence(Math.max(1, v))
+            }}
           />
         </div>
       </div>

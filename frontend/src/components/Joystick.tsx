@@ -15,6 +15,9 @@ const RADIUS = 60
 const INNER_RADIUS = 16
 const CENTER = { x: 75, y: 75 }
 
+const clampToRange = (v: number, range: [number, number]): number =>
+  Math.min(range[1], Math.max(range[0], v))
+
 export function Joystick({ label, x, y, xRange, yRange, onChange, onReset }: JoystickProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [offset, setOffset] = useState<{ nx: number; ny: number }>({ nx: 0, ny: 0 })
@@ -135,7 +138,12 @@ export function Joystick({ label, x, y, xRange, yRange, onChange, onReset }: Joy
             <input
               type="number"
               value={x}
-              onChange={(e) => onChange(Number(e.target.value), y)}
+              onChange={(e) => {
+                // Ignore empty/non-numeric edits so NaN can never leak into
+                // params (NaN offsets would silently erase all contours).
+                const v = Number(e.target.value)
+                if (Number.isFinite(v)) onChange(clampToRange(v, xRange), y)
+              }}
             />
           </label>
           <label>
@@ -143,7 +151,10 @@ export function Joystick({ label, x, y, xRange, yRange, onChange, onReset }: Joy
             <input
               type="number"
               value={y}
-              onChange={(e) => onChange(x, Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (Number.isFinite(v)) onChange(x, clampToRange(v, yRange))
+              }}
             />
           </label>
         </div>

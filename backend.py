@@ -419,21 +419,6 @@ def commit_params(req: CommitParamsRequest) -> Dict[str, Any]:
   return {"ok": True, "outputFile": str(OUTFILE_PATH)}
 
 
-if FRONTEND_DIST.is_dir():
-  # Serve built frontend assets (Vite `npm run build`) at `/`.
-  app.mount(
-    "/assets",
-    StaticFiles(directory=FRONTEND_DIST / "assets"),
-    name="assets",
-  )
-
-
-  @app.get("/", include_in_schema=False)
-  def index() -> FileResponse:
-    """Serve the SPA index.html at the root path."""
-    return FileResponse(FRONTEND_DIST / "index.html")
-
-
 @app.get("/api/contours")
 def get_contours(
     filename: str = Query(..., description="HDF5 file name under the data/ directory"),
@@ -450,9 +435,16 @@ def get_contours(
 
   The frontend expects the JSON structure documented in `frontend/CONTOUR_API.md`.
   """
-  hdf5_path = DATA_DIR / filename
-  if not hdf5_path.is_file():
-    raise HTTPException(status_code=404, detail=f"HDF5 file not found: {hdf5_path}")
+  requested = Path(filename)
+  if requested.is_absolute() or ".." in requested.parts:
+    raise HTTPException(status_code=400, detail=f"Invalid filename: {filename}")
+  hdf5_path = (DATA_DIR / requested).resolve()
+  try:
+    inside = hdf5_path.is_relative_to(DATA_DIR.resolve())
+  except AttributeError:  # Python < 3.9
+    inside = str(hdf5_path).startswith(str(DATA_DIR.resolve()))
+  if not inside or not hdf5_path.is_file():
+    raise HTTPException(status_code=404, detail=f"HDF5 file not found: {filename}")
 
   try:
     freqs_hz, data, x_coords, y_coords = _load_image_cube_from_hdf5(hdf5_path)
@@ -471,6 +463,38 @@ def get_contours(
     raise HTTPException(status_code=500, detail=str(exc)) from exc
 
   return payload
+
+
+# Serve the built frontend (Vite `npm run build`) from `/`. Registered last
+# so `/api/*` routes above take precedence over the SPA fallback.
+if FRONTEND_DIST.is_dir():
+  app.mount(
+    "/assets",
+    StaticFiles(directory=FRONTEND_DIST / "assets"),
+    name="assets",
+  )
+
+
+  @app.get("/", include_in_schema=False)
+  def index() -> FileResponse:
+    """Serve the SPA index.html at the root path."""
+    return FileResponse(FRONTEND_DIST / "index.html")
+
+
+  @app.get("/{full_path:path}", include_in_schema=False)
+  def frontend_fallback(full_path: str) -> FileResponse:
+    """Serve root-level dist files, falling back to index.html for SPA routes."""
+    if full_path.startswith("api/"):
+      raise HTTPException(status_code=404, detail="Not found")
+    dist_root = FRONTEND_DIST.resolve()
+    candidate = (FRONTEND_DIST / full_path).resolve()
+    try:
+      inside = candidate.is_relative_to(dist_root)
+    except AttributeError:  # Python < 3.9
+      inside = str(candidate).startswith(str(dist_root))
+    if inside and candidate.is_file():
+      return FileResponse(candidate)
+    return FileResponse(FRONTEND_DIST / "index.html")
 
 
 if __name__ == "__main__":

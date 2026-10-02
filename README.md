@@ -71,7 +71,7 @@ the contours line up across frequency. The left panel shows the current contours
 
 ### Layout
 
-- **Contour** (left): Multi-channel contours with the current px0, py0, px1, py1 applied. A dashed circle marks the Sun at R = 1 (if “Draw Sun R = 1” is on).
+- **Contour** (left): Multi-channel contours with the current px0, py0, px1, py1 applied. A dashed circle marks the solar disk at 1 R⊙ = 960 arcsec (if “Draw Sun R⊙” is on).
 - **Control** (top right): P0 and P1 joysticks and numeric Px/Py, **Previous/Next file** buttons, and **Commit**.
 - **Param** (top right): Contour value, power-index, Draw Sun, channel range, channel cadence.
 - **Files** (bottom right): Data file list, output CSV path, “Load param from data file (.csv)”.

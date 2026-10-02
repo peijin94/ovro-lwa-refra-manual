@@ -94,6 +94,9 @@ export function ContourPanel({
       return
     }
 
+    // Both axes use the same pixel span (size - 50) so the sky aspect ratio
+    // is 1:1. Unequal spans stretch the image and turn circles (e.g. the
+    // solar disk below) into ellipses.
     const xScale = d3
       .scaleLinear()
       .domain([-6000, 6000])
@@ -102,7 +105,7 @@ export function ContourPanel({
     const yScale = d3
       .scaleLinear()
       .domain([-6000, 6000])
-      .range([size - 30, 10])
+      .range([size - 40, 10])
 
     // Build a jet-like colormap over channel indices.
     const uniqueChannels = Array.from(new Set(selectedContours.map((c) => c.channelIndex))).sort(
@@ -123,10 +126,10 @@ export function ContourPanel({
 
     svg
       .append('rect')
-      .attr('x', 32)
-      .attr('y', 4)
-      .attr('width', size - 42)
-      .attr('height', size - 40)
+      .attr('x', 40)
+      .attr('y', 10)
+      .attr('width', size - 50)
+      .attr('height', size - 50)
       .attr('fill', 'none')
       .attr('stroke', '#1f2937')
       .attr('stroke-width', 1)
@@ -143,7 +146,7 @@ export function ContourPanel({
       .attr('stroke-width', 1.2)
       .attr('opacity', 0.9)
 
-    // Optional solar disk at R = 960 arcsec.
+    // Optional solar disk at 1 R_sun = 960 arcsec.
     if (drawSun) {
       const sunGroup = svg.append('g')
       const cx = xScale(0)
@@ -160,7 +163,7 @@ export function ContourPanel({
         .attr('stroke-dasharray', '4,4')
         .attr('opacity', 0.9)
     }
-  }, [selectedContours])
+  }, [selectedContours, drawSun])
 
   return (
     <div className="panel">
