@@ -21,6 +21,8 @@ from pydantic import BaseModel
 
 from util import recover_fits_from_h5
 
+from auto_fit import refraction_fit_param
+
 
 DATA_DIR = Path(__file__).parent / "data"
 FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
@@ -419,6 +421,319 @@ def commit_params(req: CommitParamsRequest) -> Dict[str, Any]:
   return {"ok": True, "outputFile": str(OUTFILE_PATH)}
 
 
+@app.get("/api/committed-times")
+def committed_times() -> Dict[str, Any]:
+  """Return the Time values already committed in the CSV outfile."""
+  outfile = _resolve_outfile(OUTFILE_PATH)
+  if not outfile.exists():
+    return {"times": []}
+  times: List[str] = []
+  with outfile.open("r", newline="") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      t = (row.get("Time") or "").strip()
+      if t:
+        times.append(t)
+  return {"times": times}
+
+
+def _time_from_header_meta(meta: Dict[str, Any]) -> str | None:
+  """Best-effort observation time from HDF header metadata (UTC, no trailing Z)."""
+  header = meta.get("header")
+  if header is None:
+    return None
+  for key in ("DATE-OBS", "DATE"):
+    try:
+      val = header.get(key)
+    except Exception:
+      continue
+    if not val:
+      continue
+    text = str(val).strip()
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+      try:
+        return datetime.strptime(text, fmt).strftime("%Y-%m-%dT%H:%M:%S")
+      except ValueError:
+        continue
+    try:
+      return datetime.fromisoformat(text).strftime("%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+      continue
+  return None
+
+
+def _time_from_filename_only(filename: str) -> str | None:
+  """Timestamp from the filename pattern, or None (no 'now' fallback)."""
+  m = re.search(r"(\d{4}-\d{2}-\d{2}T\d{6}Z)", filename)
+  if not m:
+    return None
+  try:
+    dt = datetime.strptime(m.group(1), "%Y-%m-%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
+  except ValueError:
+    return None
+
+
+PARAM_KEYS = ("px0", "py0", "px1", "py1")
+
+
+def _params_from_header_meta(meta: Dict[str, Any]) -> Dict[str, float | None]:
+  """Best-effort refraction params (px0/py0/px1/py1) from HDF header metadata."""
+  found: Dict[str, float | None] = {k: None for k in PARAM_KEYS}
+  header = meta.get("header")
+  sources: List[Any] = []
+  if header is not None:
+    sources.append(header)
+  sources.append(meta)
+  for key in PARAM_KEYS:
+    for source in sources:
+      for variant in (key, key.upper()):
+        try:
+          raw = source.get(variant) if hasattr(source, "get") else None
+        except Exception:
+          raw = None
+        if raw is None:
+          continue
+        try:
+          found[key] = float(raw)
+        except (TypeError, ValueError):
+          continue
+        break
+      if found[key] is not None:
+        break
+  return found
+
+
+@app.get("/api/file-times")
+def file_times() -> Dict[str, Any]:
+  """List HDF files with per-file observation times and header params."""
+  if not DATA_DIR.is_dir():
+    return {"files": []}
+  exts = {".hdf", ".hdf5", ".h5"}
+  names = sorted(p.name for p in DATA_DIR.iterdir() if p.is_file() and p.suffix in exts)
+  out: List[Dict[str, Any]] = []
+  for name in names:
+    timestamp: str | None = None
+    header_params: Dict[str, float | None] = {k: None for k in PARAM_KEYS}
+    try:
+      meta = recover_fits_from_h5(str(DATA_DIR / name), return_meta_only=True)
+      if isinstance(meta, dict):
+        timestamp = _time_from_header_meta(meta)
+        header_params = _params_from_header_meta(meta)
+    except Exception:
+      traceback.print_exc()
+    if timestamp is None:
+      timestamp = _time_from_filename_only(name)
+    out.append({"name": name, "time": timestamp, "params": header_params})
+  return {"files": out}
+
+
+@app.get("/api/param-series")
+def param_series() -> Dict[str, Any]:
+  """Return committed CSV rows with numeric params for series plots."""
+  outfile = _resolve_outfile(OUTFILE_PATH)
+  if not outfile.exists():
+    return {"rows": []}
+  rows: List[Dict[str, Any]] = []
+  with outfile.open("r", newline="") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      try:
+        rows.append(
+          {
+            "Time": (row.get("Time") or "").strip(),
+            "px0": float(row["px0"]),
+            "px1": float(row["px1"]),
+            "py0": float(row["py0"]),
+            "py1": float(row["py1"]),
+          }
+        )
+      except (KeyError, TypeError, ValueError):
+        continue
+  return {"rows": rows}
+
+
+class UpdateHeaderRequest(BaseModel):
+  filename: str
+
+
+def _resolve_data_file(filename: str) -> Path:
+  """Resolve a data filename under DATA_DIR, guarding against traversal."""
+  requested = Path(filename)
+  if requested.is_absolute() or ".." in requested.parts:
+    raise HTTPException(status_code=400, detail=f"Invalid filename: {filename}")
+  hdf5_path = (DATA_DIR / requested).resolve()
+  try:
+    inside = hdf5_path.is_relative_to(DATA_DIR.resolve())
+  except AttributeError:  # Python < 3.9
+    inside = str(hdf5_path).startswith(str(DATA_DIR.resolve()))
+  if not inside or not hdf5_path.is_file():
+    raise HTTPException(status_code=404, detail=f"HDF5 file not found: {filename}")
+  return hdf5_path
+
+
+def _read_csv_rows() -> List[Dict[str, str]]:
+  """Read raw CSV rows (empty when no outfile exists yet)."""
+  outfile = _resolve_outfile(OUTFILE_PATH)
+  if not outfile.exists():
+    return []
+  with outfile.open("r", newline="") as f:
+    return list(csv.DictReader(f))
+
+
+def _lookup_csv_row(timestamp: str) -> Dict[str, str] | None:
+  target = _normalize_time(timestamp)
+  for row in _read_csv_rows():
+    if _normalize_time(row.get("Time", "")) == target:
+      return row
+  return None
+
+
+def _write_params_to_header(hdf5_path: Path, px0: float, py0: float, px1: float, py1: float) -> None:
+  """Store refraction params as PX0/PY0/PX1/PY1 attrs on the ch_vals group."""
+  with h5py.File(hdf5_path, "r+") as f:
+    if "ch_vals" not in f:
+      raise HTTPException(status_code=400, detail=f"Not a refraction image cube: {hdf5_path.name}")
+    grp = f["ch_vals"]
+    grp.attrs["PX0"] = float(px0)
+    grp.attrs["PY0"] = float(py0)
+    grp.attrs["PX1"] = float(px1)
+    grp.attrs["PY1"] = float(py1)
+
+
+@app.post("/api/update-header")
+def update_header(req: UpdateHeaderRequest) -> Dict[str, Any]:
+  """Write the CSV-committed params for one file into its HDF header (CSV is the gold standard)."""
+  hdf5_path = _resolve_data_file(req.filename)
+  timestamp = _timestamp_from_filename(req.filename)
+  row = _lookup_csv_row(timestamp)
+  if row is None:
+    raise HTTPException(
+      status_code=404,
+      detail=f"No committed CSV row for {timestamp}. Commit first.",
+    )
+  try:
+    px0, py0, px1, py1 = (float(row[k]) for k in ("px0", "py0", "px1", "py1"))
+  except (KeyError, TypeError, ValueError):
+    raise HTTPException(status_code=500, detail=f"Stored CSV row for {timestamp} has non-numeric params.")
+  _write_params_to_header(hdf5_path, px0, py0, px1, py1)
+  return {"ok": True, "time": timestamp}
+
+
+@app.post("/api/update-all-headers")
+def update_all_headers() -> Dict[str, Any]:
+  """Write every CSV-committed row into its matching file header."""
+  rows = _read_csv_rows()
+  table = {_normalize_time(r.get("Time", "")): r for r in rows if r.get("Time")}
+  if not DATA_DIR.is_dir():
+    return {"updated": [], "skipped": []}
+  exts = {".hdf", ".hdf5", ".h5"}
+  updated: List[str] = []
+  skipped: List[str] = []
+  for path in sorted(p for p in DATA_DIR.iterdir() if p.is_file() and p.suffix in exts):
+    timestamp: str | None = None
+    try:
+      meta = recover_fits_from_h5(str(path), return_meta_only=True)
+      if isinstance(meta, dict):
+        timestamp = _time_from_header_meta(meta)
+    except Exception:
+      traceback.print_exc()
+    if timestamp is None:
+      timestamp = _time_from_filename_only(path.name)
+    row = table.get(_normalize_time(timestamp or ""))
+    if row is None:
+      skipped.append(path.name)
+      continue
+    try:
+      px0, py0, px1, py1 = (float(row[k]) for k in ("px0", "py0", "px1", "py1"))
+    except (KeyError, TypeError, ValueError):
+      skipped.append(path.name)
+      continue
+    _write_params_to_header(path, px0, py0, px1, py1)
+    updated.append(path.name)
+  return {"updated": updated, "skipped": skipped}
+
+
+@app.get("/api/browse")
+def browse(path: str = Query("")) -> Dict[str, Any]:
+  """List subdirectories and CSV files under a server-side directory."""
+  if path:
+    target = Path(path).expanduser()
+  else:
+    try:
+      default = _resolve_outfile(OUTFILE_PATH).parent
+    except Exception:
+      default = Path.home()
+    target = default if default.is_dir() else Path.home()
+  try:
+    resolved = target.resolve()
+  except Exception as exc:
+    raise HTTPException(status_code=400, detail=f"Cannot resolve path: {exc}") from exc
+  if not resolved.is_dir():
+    raise HTTPException(status_code=400, detail=f"Not a directory: {path or str(resolved)}")
+  dirs: List[str] = []
+  csvs: List[str] = []
+  try:
+    for child in resolved.iterdir():
+      if child.is_dir():
+        if not child.name.startswith("."):
+          dirs.append(child.name)
+      elif child.is_file() and child.suffix.lower() == ".csv":
+        csvs.append(child.name)
+  except PermissionError as exc:
+    raise HTTPException(status_code=403, detail=f"Cannot list directory: {exc}") from exc
+  parent = str(resolved.parent) if resolved.parent != resolved else None
+  return {"cwd": str(resolved), "parent": parent, "dirs": sorted(dirs), "csvs": sorted(csvs)}
+
+
+def _nan_to_none(v: Any) -> float | None:
+  try:
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+      return None
+    return float(v)
+  except (TypeError, ValueError):
+    return None
+
+
+@app.post("/api/uncommit")
+def uncommit(req: UpdateHeaderRequest) -> Dict[str, Any]:
+  """Remove the committed CSV row for one file (un-commit)."""
+  timestamp = _timestamp_from_filename(req.filename)
+  target = _normalize_time(timestamp)
+  rows = _read_csv_rows()
+  kept = [r for r in rows if _normalize_time(r.get("Time", "")) != target]
+  if len(kept) == len(rows):
+    raise HTTPException(status_code=404, detail=f"No committed row for {timestamp}.")
+  outfile = _resolve_outfile(OUTFILE_PATH)
+  with outfile.open("w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["Time", "px0", "px1", "py0", "py1"])
+    writer.writeheader()
+    writer.writerows(kept)
+  return {"ok": True, "time": timestamp}
+
+
+@app.post("/api/auto-fit")
+def auto_fit_file(req: UpdateHeaderRequest) -> Dict[str, Any]:
+  """Fit refraction params automatically (quiet-Sun center-of-mass vs 1/f^2)."""
+  hdf5_path = _resolve_data_file(req.filename)
+  try:
+    meta, data = recover_fits_from_h5(str(hdf5_path), return_data=True)
+    if not isinstance(meta, dict):
+      raise ValueError("No metadata recovered from file")
+    record = refraction_fit_param(data=data, meta=meta)
+  except Exception as exc:
+    traceback.print_exc()
+    raise HTTPException(status_code=500, detail=f"Auto fit failed: {exc}") from exc
+  return {
+    "px0": _nan_to_none(record.get("px0")),
+    "py0": _nan_to_none(record.get("py0")),
+    "px1": _nan_to_none(record.get("px1")),
+    "py1": _nan_to_none(record.get("py1")),
+    "nUsed": int(record.get("n_used", 0)),
+    "nRequired": int(record.get("n_required", 0)),
+  }
+
+
 @app.get("/api/contours")
 def get_contours(
     filename: str = Query(..., description="HDF5 file name under the data/ directory"),
@@ -498,6 +813,22 @@ if FRONTEND_DIST.is_dir():
 
 
 if __name__ == "__main__":
-  port = int(os.getenv("PORT", "8989"))
-  uvicorn.run("backend:app", host="127.0.0.1", port=port, reload=True)
+  import argparse
+  import threading
+  import webbrowser
+
+  parser = argparse.ArgumentParser(description="OVRO-LWA refraction manual correction backend")
+  parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8989")))
+  parser.add_argument(
+    "--no-browser",
+    action="store_true",
+    help="Do not open the default browser on startup",
+  )
+  args = parser.parse_args()
+
+  url = f"http://127.0.0.1:{args.port}"
+  if not args.no_browser:
+    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    print(f"Opening {url} in the default browser (use --no-browser to skip)")
+  uvicorn.run("starter:app", host="127.0.0.1", port=args.port, reload=True)
 

@@ -6,9 +6,7 @@ type FilePanelProps = {
   onChangeDataRootValue: (path: string) => void
   onApplyDataRoot: () => void
   outputFile: string
-  onChangeOutputFile: () => void
-  autoLoadParams: boolean
-  onChangeAutoLoadParams: (value: boolean) => void
+  onSelectCsv: () => void
 }
 
 export function FilePanel({
@@ -19,9 +17,7 @@ export function FilePanel({
   onChangeDataRootValue,
   onApplyDataRoot,
   outputFile,
-  onChangeOutputFile,
-  autoLoadParams,
-  onChangeAutoLoadParams,
+  onSelectCsv,
 }: FilePanelProps) {
   return (
     <div className="panel file-panel">
@@ -43,40 +39,27 @@ export function FilePanel({
           </select>
         </div>
         <div className="control-field control-field-wide">
-          <label htmlFor="data-dir">Data dir</label>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              id="data-dir"
-              type="text"
-              value={dataRoot}
-              onChange={(e) => onChangeDataRootValue(e.target.value)}
-              style={{ flex: 1 }}
-            />
+          <label htmlFor="data-dir">Data folder</label>
+          <textarea
+            id="data-dir"
+            rows={2}
+            value={dataRoot}
+            onChange={(e) => onChangeDataRootValue(e.target.value)}
+          />
+          <div className="csv-button-row">
             <button type="button" className="load-data-button" onClick={onApplyDataRoot}>
-              Load Data
+              Select data folder
             </button>
           </div>
         </div>
         <div className="control-field control-field-wide">
           <label htmlFor="output-file">Out .csv</label>
-          <input id="output-file" type="text" value={outputFile} readOnly />
-          <div className="control-field-row">
-            <button type="button" className="load-data-button" onClick={onChangeOutputFile}>
-              Output File
+          <textarea id="output-file" rows={2} value={outputFile} readOnly />
+          <div className="csv-button-row">
+            <button type="button" className="load-data-button" onClick={onSelectCsv}>
+              Select .csv
             </button>
           </div>
-        </div>
-        <div className="control-field control-field-wide">
-          <label htmlFor="load-param-toggle">
-            <input
-              id="load-param-toggle"
-              type="checkbox"
-              checked={autoLoadParams}
-              onChange={(e) => onChangeAutoLoadParams(e.target.checked)}
-              className="control-checkbox"
-            />
-            Load param from data file (.csv)
-          </label>
         </div>
       </div>
     </div>

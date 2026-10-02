@@ -7,7 +7,7 @@ import sys, os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend import _load_image_cube_from_hdf5, DATA_DIR
+from starter import _load_image_cube_from_hdf5, DATA_DIR
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Print freqs_arr (channel center frequencies) from an HDF5 file.")

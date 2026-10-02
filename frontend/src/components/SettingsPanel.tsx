@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ChannelRange } from '../types'
 
-type ParamsPanelProps = {
+type SettingsPanelProps = {
   contourValue: number
   onChangeContourValue: (value: number) => void
   valuePowerIndex: number
@@ -15,7 +15,18 @@ type ParamsPanelProps = {
   onChangeDrawSun: (value: boolean) => void
 }
 
-export function ParamsPanel({
+const CONTOUR_MIN = 0
+const CONTOUR_MAX = 1e6
+const CONTOUR_STEP = 1000
+
+const POWER_MIN = -1
+const POWER_MAX = 1
+const POWER_STEP = 0.01
+
+const clampNum = (v: number, lo: number, hi: number, fallback: number): number =>
+  Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback
+
+export function SettingsPanel({
   contourValue,
   onChangeContourValue,
   valuePowerIndex,
@@ -27,7 +38,7 @@ export function ParamsPanel({
   maxChannelIndex,
   drawSun,
   onChangeDrawSun,
-}: ParamsPanelProps) {
+}: SettingsPanelProps) {
   const [localContourValue, setLocalContourValue] = useState<number>(contourValue)
   const [localPowerIndex, setLocalPowerIndex] = useState<number>(valuePowerIndex)
 
@@ -38,6 +49,18 @@ export function ParamsPanel({
   useEffect(() => {
     setLocalPowerIndex(valuePowerIndex)
   }, [valuePowerIndex])
+
+  const commitContourValue = () => {
+    // Never commit NaN upstream; it would fail backend validation
+    // and leave the UI showing contours for a stale value.
+    if (Number.isFinite(localContourValue)) onChangeContourValue(localContourValue)
+    else setLocalContourValue(contourValue)
+  }
+
+  const commitPowerIndex = () => {
+    if (Number.isFinite(localPowerIndex)) onChangeValuePowerIndex(localPowerIndex)
+    else setLocalPowerIndex(valuePowerIndex)
+  }
 
   const handleChannelRangeChange = (key: 'start' | 'end', value: number) => {
     if (!Number.isFinite(value)) return
@@ -51,36 +74,54 @@ export function ParamsPanel({
   }
 
   return (
-    <div className="panel params-panel">
-      <div className="panel-title">Param</div>
-      <div className="params-panel-fields">
+    <div className="panel settings-panel">
+      <div className="panel-title">Settings</div>
+      <div className="settings-panel-fields">
         <div className="control-field">
           <label htmlFor="contour-value">Contour value</label>
-          <input
-            id="contour-value"
-            type="number"
-            value={Number.isFinite(localContourValue) ? localContourValue : 0}
-            onChange={(e) => setLocalContourValue(Number(e.target.value))}
-            onBlur={() => {
-              // Never commit NaN upstream; it would fail backend validation
-              // and leave the UI showing contours for a stale value.
-              if (Number.isFinite(localContourValue)) onChangeContourValue(localContourValue)
-              else setLocalContourValue(contourValue)
-            }}
-          />
+          <div className="slider-row">
+            <input
+              type="range"
+              aria-label="Contour value slider"
+              min={CONTOUR_MIN}
+              max={CONTOUR_MAX}
+              step={CONTOUR_STEP}
+              value={clampNum(localContourValue, CONTOUR_MIN, CONTOUR_MAX, CONTOUR_MIN)}
+              onChange={(e) => setLocalContourValue(Number(e.target.value))}
+              onPointerUp={commitContourValue}
+              onKeyUp={commitContourValue}
+            />
+            <input
+              id="contour-value"
+              type="number"
+              value={Number.isFinite(localContourValue) ? localContourValue : 0}
+              onChange={(e) => setLocalContourValue(Number(e.target.value))}
+              onBlur={commitContourValue}
+            />
+          </div>
         </div>
         <div className="control-field">
           <label htmlFor="value-power-index">Power-index</label>
-          <input
-            id="value-power-index"
-            type="number"
-            value={Number.isFinite(localPowerIndex) ? localPowerIndex : 0}
-            onChange={(e) => setLocalPowerIndex(Number(e.target.value))}
-            onBlur={() => {
-              if (Number.isFinite(localPowerIndex)) onChangeValuePowerIndex(localPowerIndex)
-              else setLocalPowerIndex(valuePowerIndex)
-            }}
-          />
+          <div className="slider-row">
+            <input
+              type="range"
+              aria-label="Power-index slider"
+              min={POWER_MIN}
+              max={POWER_MAX}
+              step={POWER_STEP}
+              value={clampNum(localPowerIndex, POWER_MIN, POWER_MAX, 0)}
+              onChange={(e) => setLocalPowerIndex(Number(e.target.value))}
+              onPointerUp={commitPowerIndex}
+              onKeyUp={commitPowerIndex}
+            />
+            <input
+              id="value-power-index"
+              type="number"
+              value={Number.isFinite(localPowerIndex) ? localPowerIndex : 0}
+              onChange={(e) => setLocalPowerIndex(Number(e.target.value))}
+              onBlur={commitPowerIndex}
+            />
+          </div>
         </div>
         <div className="control-field">
           <label htmlFor="draw-sun">
